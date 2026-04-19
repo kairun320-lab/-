@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>在庫管理（クラウド同期）</title>
+<title>在庫管理</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
 body { font-family: sans-serif; margin: 10px; font-size: 13px; }
@@ -252,6 +255,11 @@ window.updateOpenDate = function(i,v){
   items[i].openDate=v;
   save();
 };
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js")
+    .then(() => console.log("SW登録OK"));
+}
 
 </script>
 
