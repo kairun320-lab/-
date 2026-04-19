@@ -9,7 +9,12 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
-body { font-family: sans-serif; margin: 10px; font-size: 13px; }
+body {
+  font-family: sans-serif;
+  margin: 10px;
+  font-size: 13px;
+  overflow-x: hidden;
+}
 h1 { text-align: center; }
 
 .grid {
@@ -25,11 +30,22 @@ h1 { text-align: center; }
   gap: 6px;
   border-bottom: 1px solid #ccc;
   padding: 2px;
-  line-height: 1.2; /* ← 行間調整 */
+  line-height: 1.2;
+
+  min-width: 0; /* ← これ追加（重要） */
 }
 
-.item > div { white-space: nowrap; }
-.item > div:first-child { flex:1; }
+.item > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 名前だけ1行固定 */
+.item > div:first-child {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
 
 .qty-box { display:flex; gap:2px; }
 .qty-box input { width:28px; text-align:center; }
@@ -46,7 +62,7 @@ input[type="date"] {
 
 /* ▼ ボタンをコンパクトに */
 button {
-  padding: 1px 5px;
+  padding: 3px 6px;
   font-size: 12px;
 }
 
@@ -63,6 +79,7 @@ h2 {
   border: 2px solid #000;
   padding: 3px;
 }
+  
 </style>
 </head>
 
