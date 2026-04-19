@@ -91,12 +91,12 @@ h2 {
 <input id="name" placeholder="食品名">
 
 <select id="category">
-<option>野菜</option>
-<option>肉</option>
-<option>冷蔵その他</option>
-<option>冷凍</option>
-<option>調味料</option>
-<option>備蓄</option>
+<option value="野菜">野菜</option>
+<option value="肉">肉</option>
+<option value="冷蔵その他">冷蔵その他</option>
+<option value="冷凍">冷凍</option>
+<option value="調味料">調味料</option>
+<option value="備蓄">備蓄</option>
 </select>
 
 <input id="quantity" type="number" placeholder="数量">
@@ -189,8 +189,11 @@ function render(){
 
   let list = [];
 
-  items.forEach((item,i)=>{
-    item.dates.forEach((d,di)=>{
+items.forEach((item,i)=>{
+  if (!item.category) return;
+  const dates = Array.isArray(item.dates) ? item.dates : [''];
+
+  dates.forEach((d,di)=>{
       const level = getLevel(item,d);
 
       // 日付距離（ソート用）
@@ -211,42 +214,50 @@ function render(){
   });
 
   // 描画
-  list.forEach(({item,i,di,d,level})=>{
+ list.forEach(({item,i,di,d,level})=>{
 
-    const div=document.createElement('div');
-    div.className='item';
+  const div=document.createElement('div');
+  div.className='item';
 
-    if(item.quantity==0) div.classList.add('zero');
-    if(level===2) div.classList.add('expired');
-    else if(level===1) div.classList.add('warn');
+  if(item.quantity==0) div.classList.add('zero');
+  if(level===2) div.classList.add('expired');
+  else if(level===1) div.classList.add('warn');
 
-    div.innerHTML=`
-      <div>${item.name}</div>
+  div.innerHTML=`
+    <div>${item.name}</div>
 
-      <div class="qty-box">
-        <button onclick="changeQty(${i},-1)">-</button>
-        <input value="${item.quantity}" onchange="updateQty(${i},this.value)">
-        <button onclick="changeQty(${i},1)">+</button>
-      </div>
+    <div class="qty-box">
+      <button onclick="changeQty(${i},-1)">-</button>
+      <input value="${item.quantity}" onchange="updateQty(${i},this.value)">
+      <button onclick="changeQty(${i},1)">+</button>
+    </div>
 
-      <div>${item.dateType === 'purchase' ? '購入' : '期限'}</div>
+    <div>${item.dateType === 'purchase' ? '購入' : '期限'}</div>
 
-      <div>
-        <input type="date" value="${d}" onchange="updateDate(${i},${di},this.value)">
-        <button onclick="addDate(${i})">＋</button>
-      </div>
+    <div>
+      <input type="date" value="${d}" onchange="updateDate(${i},${di},this.value)">
+      <button onclick="addDate(${i})">＋</button>
+    </div>
 
-      <div>
-        開封:
-        <input type="date" value="${item.openDate || ''}" onchange="updateOpenDate(${i},this.value)">
-      </div>
+    <div>
+      開封:
+      <input type="date" value="${item.openDate || ''}" onchange="updateOpenDate(${i},this.value)">
+    </div>
 
-      <button onclick="delDate(${i},${di})">×</button>
-    `;
+    <button onclick="delDate(${i},${di})">×</button>
+  `;
 
-    document.getElementById(item.category).appendChild(div);
-  });
-}
+  // ▼ここ追加
+  const target = document.getElementById(item.category);
+
+  if (!target) {
+    console.log("カテゴリ見つからない:", item.category);
+    return;
+  }
+
+  target.appendChild(div);
+}); //
+  }
 
 /* 操作 */
 window.addItem = function(){
