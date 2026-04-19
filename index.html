@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>在庫管理</title>
-<link rel="manifest" href="manifest.json?v=10">
+<link rel="manifest" href="manifest.json?v=11">
 <meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="icon-192.png">
 
@@ -79,7 +79,19 @@ h2 {
   border: 2px solid #000;
   padding: 3px;
 }
-  
+@media(max-width:600px){
+
+  .item {
+    flex-wrap: wrap; /* ← 折り返す */
+  }
+
+  .item > div:first-child {
+    width: 100%;      /* ← 名前を1行占有 */
+    white-space: normal; /* ← 折り返しOK */
+    font-weight: bold;
+  }
+
+}  
 </style>
 </head>
 
