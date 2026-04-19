@@ -1,4 +1,4 @@
-const CACHE_NAME = "fridge-app-v10"; // ← 更新時は必ず変更
+const CACHE_NAME = "fridge-app-v11"; // ← 更新時は必ず変更
 
 // 最初にキャッシュするファイル
 const STATIC_ASSETS = [
