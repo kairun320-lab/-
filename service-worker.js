@@ -1,4 +1,4 @@
-const CACHE_NAME = "fridge-app-v8"; // ← バージョン必ず変える
+const CACHE_NAME = "fridge-app-v9"; // ← バージョン必ず変える
 
 const urlsToCache = [
   "./",
@@ -26,6 +26,10 @@ self.addEventListener("activate", (event) => {
 
 /* ★ここが重要 */
 self.addEventListener("fetch", (event) => {
+
+  // ★ GET以外は無視（超重要）
+  if (event.request.method !== "GET") return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
