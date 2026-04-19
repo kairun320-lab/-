@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在庫管理（クラウド同期）</title>
+
+<style>
+body { font-family: sans-serif; margin: 10px; font-size: 13px; }
+h1 { text-align: center; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.category {
+  border: 2px solid #000;
+  padding: 5px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #ccc;
+  padding: 3px;
+}
+
+.item > div { white-space: nowrap; }
+.item > div:first-child { flex:1; }
+
+.qty-box { display:flex; gap:2px; }
+.qty-box input { width:28px; text-align:center; }
+
+.zero { color:#aaa; }
+.warn { background:#fff3cd; }
+.expired { background:#ffdede; }
+
+@media(max-width:600px){
+  .grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<h1>在庫管理</h1>
+
+<div>
+<input id="name" placeholder="食品名">
+
+<select id="category">
+<option>野菜</option>
+<option>肉</option>
+<option>冷蔵その他</option>
+<option>冷凍</option>
+<option>調味料</option>
+<option>備蓄</option>
+</select>
+
+<input id="quantity" type="number" placeholder="数量">
+
+<select id="dateType">
+<option value="purchase">購入</option>
+<option value="expiry">期限</option>
+</select>
+
+<input type="date" id="date">
+<input type="date" id="openDate">
+
+<button onclick="addItem()">追加</button>
+</div>
+
+<div class="grid">
+<div class="category"><h2>野菜</h2><div id="野菜"></div></div>
+<div class="category"><h2>肉</h2><div id="肉"></div></div>
+<div class="category"><h2>冷蔵その他</h2><div id="冷蔵その他"></div></div>
+<div class="category"><h2>冷凍</h2><div id="冷凍"></div></div>
+<div class="category"><h2>調味料</h2><div id="調味料"></div></div>
+<div class="category"><h2>備蓄</h2><div id="備蓄"></div></div>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB1VUJ-l3EwVBYcfFPBX7VnDIZiS7eiGck",
+  authDomain: "fridge-app-78a3b.firebaseapp.com",
+  projectId: "fridge-app-78a3b",
+  storageBucket: "fridge-app-78a3b.firebasestorage.app",
+  messagingSenderId: "883894430124",
+  appId: "1:883894430124:web:f8575fd6c2474b00e67209"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let items = [];
+
+async function save(){
+  await setDoc(doc(db, "items", "main"), { data: items });
+}
+
+onSnapshot(doc(db, "items", "main"), (snap)=>{
+  if(snap.exists()){
+    items = snap.data().data;
+    render();
+  }
+});
+
+/* レベル計算 */
+function getLevel(item, d){
+  const today = new Date().toISOString().split('T')[0];
+  let level = 0;
+
+  // 開封
+  if(item.openDate){
+    const diff = (new Date(today) - new Date(item.openDate)) / 86400000;
+    if(diff >= 10) level = Math.max(level,2);
+    else if(diff >= 5) level = Math.max(level,1);
+  }
+
+  // 期限
+  if(item.dateType === 'expiry' && d){
+    const diff = (new Date(d) - new Date(today)) / 86400000;
+    if(diff <= 3) level = Math.max(level,2);
+    else if(diff <= 5) level = Math.max(level,1);
+  }
+
+  // 購入
+  if(item.dateType === 'purchase' && d){
+    const diff = (new Date(today) - new Date(d)) / 86400000;
+    if(diff >= 7) level = Math.max(level,2);
+    else if(diff >= 5) level = Math.max(level,1);
+  }
+
+  return level;
+}
+
+/* 描画 */
+function render(){
+  const cats = ['野菜','肉','冷蔵その他','冷凍','調味料','備蓄'];
+  cats.forEach(c=> document.getElementById(c).innerHTML='');
+
+  let list = [];
+
+  items.forEach((item,i)=>{
+    item.dates.forEach((d,di)=>{
+      const level = getLevel(item,d);
+
+      // 日付距離（ソート用）
+      let diff = 9999;
+      if(d){
+        const today = new Date();
+        diff = Math.abs((new Date(d) - today)/86400000);
+      }
+
+      list.push({item,i,di,d,level,diff});
+    });
+  });
+
+  // 並び替え
+  list.sort((a,b)=>{
+    if(b.level !== a.level) return b.level - a.level;
+    return a.diff - b.diff;
+  });
+
+  // 描画
+  list.forEach(({item,i,di,d,level})=>{
+
+    const div=document.createElement('div');
+    div.className='item';
+
+    if(item.quantity==0) div.classList.add('zero');
+    if(level===2) div.classList.add('expired');
+    else if(level===1) div.classList.add('warn');
+
+    div.innerHTML=`
+      <div>${item.name}</div>
+
+      <div class="qty-box">
+        <button onclick="changeQty(${i},-1)">-</button>
+        <input value="${item.quantity}" onchange="updateQty(${i},this.value)">
+        <button onclick="changeQty(${i},1)">+</button>
+      </div>
+
+      <div>${item.dateType === 'purchase' ? '購入' : '期限'}</div>
+
+      <div>
+        <input type="date" value="${d}" onchange="updateDate(${i},${di},this.value)">
+        <button onclick="addDate(${i})">＋</button>
+      </div>
+
+      <div>
+        開封:
+        <input type="date" value="${item.openDate || ''}" onchange="updateOpenDate(${i},this.value)">
+      </div>
+
+      <button onclick="delDate(${i},${di})">×</button>
+    `;
+
+    document.getElementById(item.category).appendChild(div);
+  });
+}
+
+/* 操作 */
+window.addItem = function(){
+  const name = document.getElementById('name').value;
+  const category = document.getElementById('category').value;
+  let quantity = parseInt(document.getElementById('quantity').value)||0;
+  const date = document.getElementById('date').value;
+  const dateType = document.getElementById('dateType').value;
+  const openDate = document.getElementById('openDate').value;
+
+  if(!name) return;
+  if(quantity>99) quantity=99;
+
+  items.push({name,category,quantity,dateType,dates:[date],openDate});
+  save();
+};
+
+window.changeQty = function(i,d){
+  items[i].quantity=Math.max(0,Math.min(99,items[i].quantity+d));
+  save();
+};
+
+window.updateQty = function(i,v){
+  items[i].quantity=Math.max(0,Math.min(99,parseInt(v)||0));
+  save();
+};
+
+window.updateDate = function(i,di,v){
+  items[i].dates[di]=v;
+  save();
+};
+
+window.addDate = function(i){
+  items[i].dates.push('');
+  save();
+};
+
+window.delDate = function(i,di){
+  items[i].dates.splice(di,1);
+  save();
+};
+
+window.updateOpenDate = function(i,v){
+  items[i].openDate=v;
+  save();
+};
+
+</script>
+
+</body>
+</html>
