@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>在庫管理</title>
-<link rel="manifest" href="manifest.json?v=3">
-<meta name="theme-color" content="#000000">
-<link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
 body {
@@ -21,7 +18,6 @@ h1 { text-align: center; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  align-items: start;
 }
 
 .item {
@@ -31,8 +27,7 @@ h1 { text-align: center; }
   border-bottom: 1px solid #ccc;
   padding: 2px;
   line-height: 1.2;
-
-  min-width: 0; /* ← これ追加（重要） */
+  min-width: 0;
 }
 
 .item > div {
@@ -40,7 +35,6 @@ h1 { text-align: center; }
   text-overflow: ellipsis;
 }
 
-/* 名前だけ1行固定 */
 .item > div:first-child {
   flex: 1;
   min-width: 0;
@@ -54,13 +48,11 @@ h1 { text-align: center; }
 .warn { background:#fff3cd; }
 .expired { background:#ffdede; }
 
-/* ▼ 日付入力をコンパクトに */
 input[type="date"] {
   font-size: 12px;
   padding: 1px;
 }
 
-/* ▼ ボタンをコンパクトに */
 button {
   padding: 3px 6px;
   font-size: 12px;
@@ -70,16 +62,10 @@ button {
   .grid { grid-template-columns:1fr; }
 }
 
-h2 {
-  margin: 0 0 2px 0;
-  font-size: 13px;
-}
-
 .category {
   border: 2px solid #000;
   padding: 3px;
 }
-  
 </style>
 </head>
 
@@ -89,7 +75,6 @@ h2 {
 
 <div>
 <input id="name" placeholder="食品名">
-
 <select id="category">
 <option>野菜</option>
 <option>肉</option>
@@ -122,17 +107,13 @@ h2 {
 </div>
 
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB1VUJ-l3EwVBYcfFPBX7VnDIZiS7eiGck",
   authDomain: "fridge-app-78a3b.firebaseapp.com",
-  projectId: "fridge-app-78a3b",
-  storageBucket: "fridge-app-78a3b.firebasestorage.app",
-  messagingSenderId: "883894430124",
-  appId: "1:883894430124:web:f8575fd6c2474b00e67209"
+  projectId: "fridge-app-78a3b"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -140,15 +121,19 @@ const db = getFirestore(app);
 
 let items = [];
 
+/* 保存 */
 async function save(){
   await setDoc(doc(db, "items", "main"), { data: items });
 }
 
+/* 監視（修正版） */
 onSnapshot(doc(db, "items", "main"), (snap)=>{
   if(snap.exists()){
-    items = snap.data().data;
-    render();
+    items = snap.data().data || [];
+  } else {
+    items = [];
   }
+  render();
 });
 
 /* レベル計算 */
@@ -156,24 +141,21 @@ function getLevel(item, d){
   const today = new Date().toISOString().split('T')[0];
   let level = 0;
 
-  // 開封
   if(item.openDate){
     const diff = (new Date(today) - new Date(item.openDate)) / 86400000;
-    if(diff >= 10) level = Math.max(level,2);
-    else if(diff >= 5) level = Math.max(level,1);
+    if(diff >= 10) level = 2;
+    else if(diff >= 5) level = 1;
   }
 
-  // 期限
   if(item.dateType === 'expiry' && d){
     const diff = (new Date(d) - new Date(today)) / 86400000;
-    if(diff <= 3) level = Math.max(level,2);
+    if(diff <= 3) level = 2;
     else if(diff <= 5) level = Math.max(level,1);
   }
 
-  // 購入
   if(item.dateType === 'purchase' && d){
     const diff = (new Date(today) - new Date(d)) / 86400000;
-    if(diff >= 7) level = Math.max(level,2);
+    if(diff >= 7) level = 2;
     else if(diff >= 5) level = Math.max(level,1);
   }
 
@@ -185,83 +167,72 @@ function render(){
   const cats = ['野菜','肉','冷蔵その他','冷凍','調味料','備蓄'];
   cats.forEach(c=> document.getElementById(c).innerHTML='');
 
-  let list = [];
-
   items.forEach((item,i)=>{
     item.dates.forEach((d,di)=>{
+
+      const div=document.createElement('div');
+      div.className='item';
+
       const level = getLevel(item,d);
+      if(item.quantity==0) div.classList.add('zero');
+      if(level===2) div.classList.add('expired');
+      else if(level===1) div.classList.add('warn');
 
-      // 日付距離（ソート用）
-      let diff = 9999;
-      if(d){
-        const today = new Date();
-        diff = Math.abs((new Date(d) - today)/86400000);
-      }
+      div.innerHTML=`
+        <div>${item.name}</div>
 
-      list.push({item,i,di,d,level,diff});
+        <div class="qty-box">
+          <button onclick="changeQty(${i},-1)">-</button>
+          <input value="${item.quantity}" onchange="updateQty(${i},this.value)">
+          <button onclick="changeQty(${i},1)">+</button>
+        </div>
+
+        <div>${item.dateType === 'purchase' ? '購入' : '期限'}</div>
+
+        <div>
+          <input type="date" value="${d}" onchange="updateDate(${i},${di},this.value)">
+        </div>
+
+        <button onclick="delDate(${i},${di})">×</button>
+      `;
+
+      document.getElementById(item.category).appendChild(div);
     });
-  });
-
-  // 並び替え
-  list.sort((a,b)=>{
-    if(b.level !== a.level) return b.level - a.level;
-    return a.diff - b.diff;
-  });
-
-  // 描画
-  list.forEach(({item,i,di,d,level})=>{
-
-    const div=document.createElement('div');
-    div.className='item';
-
-    if(item.quantity==0) div.classList.add('zero');
-    if(level===2) div.classList.add('expired');
-    else if(level===1) div.classList.add('warn');
-
-    div.innerHTML=`
-      <div>${item.name}</div>
-
-      <div class="qty-box">
-        <button onclick="changeQty(${i},-1)">-</button>
-        <input value="${item.quantity}" onchange="updateQty(${i},this.value)">
-        <button onclick="changeQty(${i},1)">+</button>
-      </div>
-
-      <div>${item.dateType === 'purchase' ? '購入' : '期限'}</div>
-
-      <div>
-        <input type="date" value="${d}" onchange="updateDate(${i},${di},this.value)">
-        <button onclick="addDate(${i})">＋</button>
-      </div>
-
-      <div>
-        開封:
-        <input type="date" value="${item.openDate || ''}" onchange="updateOpenDate(${i},this.value)">
-      </div>
-
-      <button onclick="delDate(${i},${di})">×</button>
-    `;
-
-    document.getElementById(item.category).appendChild(div);
   });
 }
 
-/* 操作 */
+/* ★ 強化版追加 */
 window.addItem = function(){
-  const name = document.getElementById('name').value;
+  const name = document.getElementById('name').value.trim();
+  if(!name) return;
+
   const category = document.getElementById('category').value;
   let quantity = parseInt(document.getElementById('quantity').value)||0;
   const date = document.getElementById('date').value;
   const dateType = document.getElementById('dateType').value;
   const openDate = document.getElementById('openDate').value;
 
-  if(!name) return;
   if(quantity>99) quantity=99;
+  if(!items) items=[];
 
-  items.push({name,category,quantity,dateType,dates:[date],openDate});
+  items.push({
+    name,
+    category,
+    quantity,
+    dateType,
+    dates:[date || ''],
+    openDate
+  });
+
   save();
+
+  // 入力リセット
+  document.getElementById('name').value='';
+  document.getElementById('quantity').value='';
+  document.getElementById('date').value='';
 };
 
+/* 操作 */
 window.changeQty = function(i,d){
   items[i].quantity=Math.max(0,Math.min(99,items[i].quantity+d));
   save();
@@ -277,26 +248,10 @@ window.updateDate = function(i,di,v){
   save();
 };
 
-window.addDate = function(i){
-  items[i].dates.push('');
-  save();
-};
-
 window.delDate = function(i,di){
   items[i].dates.splice(di,1);
   save();
 };
-
-window.updateOpenDate = function(i,v){
-  items[i].openDate=v;
-  save();
-};
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js")
-    .then(() => console.log("SW登録OK"));
-}
-
 </script>
 
 </body>
