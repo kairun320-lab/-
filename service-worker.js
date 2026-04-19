@@ -1,4 +1,4 @@
-const CACHE_NAME = "fridge-app-v4"; // ← バージョン必ず変える
+const CACHE_NAME = "fridge-app-v5"; // ← バージョン必ず変える
 
 const urlsToCache = [
   "./",
